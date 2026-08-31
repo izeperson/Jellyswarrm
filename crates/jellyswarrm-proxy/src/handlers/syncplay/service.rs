@@ -246,11 +246,20 @@ impl SyncPlayService {
     ) -> Uuid {
         let mut state = self.state.write().await;
         let connection_id = Uuid::new_v4();
+
+        if state.ws_connections.contains_key(&session_id)
+            || state.ws_connection_ids.contains_key(&session_id)
+            || state.disconnect_grace_ids.contains_key(&session_id)
+        {
+            state.ws_connections.remove(&session_id);
+            state.ws_connection_ids.remove(&session_id);
+            state.disconnect_grace_ids.remove(&session_id);
+        }
+
         state.ws_connections.insert(session_id.clone(), tx);
         state
             .ws_connection_ids
             .insert(session_id.clone(), connection_id);
-        state.disconnect_grace_ids.remove(&session_id);
         debug!(session_id = %session_id, "Registered SyncPlay websocket");
         state.send_to_session(&session_id, "ForceKeepAlive", &15_u64);
 
@@ -658,6 +667,29 @@ mod tests {
             }
         }
         out
+    }
+
+    #[tokio::test]
+    async fn test_re_registering_websocket_clears_stale_disconnect_state() {
+        let service = SyncPlayService::new();
+        let s1 = make_session(make_user("u1", "alice"), "web");
+        let (tx1, mut rx1) = mpsc::unbounded_channel::<String>();
+        let (tx2, mut rx2) = mpsc::unbounded_channel::<String>();
+
+        let first_connection_id = service.register_websocket(s1.session_id.clone(), tx1).await;
+        let _ = recv_json(&mut rx1).await;
+
+        service
+            .unregister_websocket_with_grace(s1.session_id.clone(), first_connection_id)
+            .await;
+        assert!(service.state.read().await.disconnect_grace_ids.contains_key(&s1.session_id));
+
+        let second_connection_id = service.register_websocket(s1.session_id.clone(), tx2).await;
+        let _ = recv_json(&mut rx2).await;
+
+        let state = service.state.read().await;
+        assert_eq!(state.ws_connection_ids.get(&s1.session_id), Some(&second_connection_id));
+        assert!(!state.disconnect_grace_ids.contains_key(&s1.session_id));
     }
 
     #[tokio::test]

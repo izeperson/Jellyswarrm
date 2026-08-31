@@ -106,8 +106,29 @@ impl QuickConnectStorage {
 
     pub fn store_session(&self, session: QuickConnectSession) {
         let mut sessions = self.sessions_lock();
+
+        if let Some(existing) = sessions.get(&session.secret).cloned() {
+            sessions.remove(&existing.secret);
+            sessions.remove(&existing.code);
+        }
+
+        if let Some(existing) = sessions.get(&session.code).cloned() {
+            sessions.remove(&existing.secret);
+            sessions.remove(&existing.code);
+        }
+
         sessions.insert(session.secret.clone(), session.clone());
         sessions.insert(session.code.clone(), session);
+    }
+
+    pub fn generate_unique_code(&self) -> String {
+        loop {
+            let code = generate_code();
+            let sessions = self.sessions_lock();
+            if !sessions.contains_key(&code) {
+                return code;
+            }
+        }
     }
 
     pub fn get_session(&self, key: &str) -> Option<QuickConnectSession> {
@@ -321,7 +342,7 @@ pub async fn handle_quick_connect_initiate(
     headers: HeaderMap,
 ) -> Result<Json<QuickConnectSession>, StatusCode> {
     let secret = Uuid::new_v4().to_string();
-    let code = generate_code();
+    let code = state.quick_connect.generate_unique_code();
     let (device_id, device_name, app_name, app_version) = parse_client_info(&headers);
 
     info!(
@@ -768,6 +789,65 @@ mod tests {
 
         assert_eq!(pascal.secret, "abc");
         assert_eq!(camel.secret, "xyz");
+    }
+
+    #[test]
+    fn quick_connect_storage_replaces_colliding_code_without_deleting_active_session() {
+        let storage = QuickConnectStorage::new();
+        let first = QuickConnectSession::new(
+            "secret-1".to_string(),
+            "123456".to_string(),
+            "device-1".to_string(),
+            "Device 1".to_string(),
+            "App".to_string(),
+            "1.0.0".to_string(),
+        );
+        let second = QuickConnectSession::new(
+            "secret-2".to_string(),
+            "123456".to_string(),
+            "device-2".to_string(),
+            "Device 2".to_string(),
+            "App".to_string(),
+            "1.0.0".to_string(),
+        );
+
+        storage.store_session(first.clone());
+        storage.store_session(second.clone());
+
+        let active = storage.get_session("123456").unwrap();
+        assert_eq!(active.secret, second.secret);
+        assert_eq!(active.device_id, "device-2");
+        assert!(storage.get_session("secret-1").is_none());
+        assert_eq!(storage.get_session("secret-2").unwrap().secret, "secret-2");
+    }
+
+    #[test]
+    fn quick_connect_storage_replaces_colliding_secret_without_losing_active_code() {
+        let storage = QuickConnectStorage::new();
+        let first = QuickConnectSession::new(
+            "secret-dup".to_string(),
+            "111111".to_string(),
+            "device-1".to_string(),
+            "Device 1".to_string(),
+            "App".to_string(),
+            "1.0.0".to_string(),
+        );
+        let second = QuickConnectSession::new(
+            "secret-dup".to_string(),
+            "222222".to_string(),
+            "device-2".to_string(),
+            "Device 2".to_string(),
+            "App".to_string(),
+            "1.0.0".to_string(),
+        );
+
+        storage.store_session(first.clone());
+        storage.store_session(second.clone());
+
+        assert!(storage.get_session("secret-dup").is_some());
+        assert_eq!(storage.get_session("secret-dup").unwrap().code, "222222");
+        assert!(storage.get_session("111111").is_none());
+        assert_eq!(storage.get_session("222222").unwrap().device_id, "device-2");
     }
 
     #[test]

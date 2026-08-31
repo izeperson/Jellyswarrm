@@ -109,18 +109,36 @@ fn episode_number(item: &MediaItem, field: &str) -> i32 {
 
 fn provider_identity(item: &MediaItem) -> Option<String> {
     let provider_ids = item.provider_ids.as_ref()?.as_object()?;
-    for preferred in ["Tmdb", "Imdb", "Tvdb", "TmdbCollection"] {
-        for (key, value) in provider_ids {
-            if key.eq_ignore_ascii_case(preferred) {
-                if let Some(id) = value.as_str() {
-                    if !id.is_empty() {
-                        return Some(format!("{}:{id}", preferred.to_ascii_lowercase()));
-                    }
-                }
+    let mut identities = provider_ids
+        .iter()
+        .filter_map(|(key, value)| {
+            let id = value.as_str()?;
+            let id = id.trim();
+            if id.is_empty() {
+                None
+            } else {
+                Some((key.to_ascii_lowercase(), id.to_string()))
             }
-        }
+        })
+        .collect::<Vec<_>>();
+
+    if identities.is_empty() {
+        return None;
     }
-    None
+
+    identities.sort_by(|(left_key, left_id), (right_key, right_id)| {
+        left_key
+            .cmp(right_key)
+            .then_with(|| left_id.cmp(right_id))
+    });
+
+    Some(
+        identities
+            .into_iter()
+            .map(|(key, id)| format!("{key}:{id}"))
+            .collect::<Vec<_>>()
+            .join("|"),
+    )
 }
 
 fn normalized_name(item: &MediaItem) -> String {
@@ -235,6 +253,44 @@ mod tests {
                 .filter_map(|item| item.name.as_deref())
                 .collect::<Vec<_>>(),
             vec!["Crash", "Crash"]
+        );
+    }
+
+    #[test]
+    fn custom_plugin_provider_ids_are_considered_in_duplicate_detection() {
+        let mut first = tagged(1, 100, "Crash", "1996");
+        first.item.provider_ids = Some(serde_json::json!({ "Tmdb": "1996", "AniList": "anime-42" }));
+
+        let mut second = tagged(2, 100, "Crash", "2004");
+        second.item.provider_ids = Some(serde_json::json!({ "Tmdb": "2004", "AniList": "anime-99" }));
+
+        let result = label_duplicates(vec![first, second]);
+
+        assert_eq!(
+            result
+                .iter()
+                .filter_map(|item| item.name.as_deref())
+                .collect::<Vec<_>>(),
+            vec!["Crash", "Crash"]
+        );
+    }
+
+    #[test]
+    fn same_custom_plugin_provider_id_is_still_treated_as_the_same_item() {
+        let mut first = tagged(1, 100, "Crash", "1996");
+        first.item.provider_ids = Some(serde_json::json!({ "AniList": "anime-42" }));
+
+        let mut second = tagged(2, 100, "Crash", "1996");
+        second.item.provider_ids = Some(serde_json::json!({ "AniList": "anime-42" }));
+
+        let result = label_duplicates(vec![first, second]);
+
+        assert_eq!(
+            result
+                .iter()
+                .filter_map(|item| item.name.as_deref())
+                .collect::<Vec<_>>(),
+            vec!["Crash [Server 1]", "Crash [Server 2]"]
         );
     }
 

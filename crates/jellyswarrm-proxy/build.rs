@@ -1,20 +1,37 @@
 use std::{env, fs, io::Write, path::PathBuf, process::Command};
 
+fn ensure_static_dir(dist_dir: &PathBuf) {
+    if !dist_dir.exists() {
+        fs::create_dir_all(dist_dir).expect("Failed to create static dir for embedded UI assets");
+    }
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=migrations");
 
-    if std::env::var("JELLYSWARRM_SKIP_UI").ok().as_deref() == Some("1") {
-        println!("cargo:warning=Skipping internal UI build (JELLYSWARRM_SKIP_UI=1)");
-        return;
-    }
     // Get the path to the crate's directory
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 
     // Assume workspace root is two levels up from this crate (adjust if needed)
     let workspace_root = manifest_dir.parent().unwrap().parent().unwrap();
+    let dist_dir = manifest_dir.join("static"); // static/ in the crate
+    ensure_static_dir(&dist_dir);
+
+    if std::env::var("JELLYSWARRM_SKIP_UI").ok().as_deref() == Some("1") {
+        println!("cargo:warning=Skipping internal UI build (JELLYSWARRM_SKIP_UI=1)");
+        generate_ui_version_file(workspace_root);
+        return;
+    }
 
     let ui_dir = workspace_root.join("ui");
-    let dist_dir = manifest_dir.join("static"); // static/ in the crate
+    if !ui_dir.exists() || !ui_dir.join("package.json").exists() {
+        println!(
+            "cargo:warning=UI checkout missing at {}. Skipping embedded UI build.",
+            ui_dir.display()
+        );
+        generate_ui_version_file(workspace_root);
+        return;
+    }
 
     // Get the latest commit hash for the ui submodule
     let output = Command::new("git")
@@ -76,38 +93,43 @@ fn main() {
 
 fn generate_ui_version_file(workspace_root: &std::path::Path) {
     let ui_dir = workspace_root.join("ui");
-
-    // Get UI version
-    let version_output = Command::new("git")
-        .args([
-            "-C",
-            ui_dir.to_str().unwrap(),
-            "describe",
-            "--tags",
-            "--abbrev=0",
-        ])
-        .output()
-        .expect("Failed to get UI version");
-    let ui_version = String::from_utf8_lossy(&version_output.stdout)
-        .trim()
-        .trim_start_matches('v')
-        .to_string();
-
-    // Get UI commit hash
-    let commit_output = Command::new("git")
-        .args(["-C", ui_dir.to_str().unwrap(), "rev-parse", "HEAD"])
-        .output()
-        .expect("Failed to get UI commit hash");
-    let ui_commit = String::from_utf8_lossy(&commit_output.stdout)
-        .trim()
-        .to_string();
-
-    // Write version file
-    let version_content = format!("UI_VERSION={}\nUI_COMMIT={}\n", ui_version, ui_commit);
-
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let dist_dir = manifest_dir.join("static");
     let version_file_in_dist = dist_dir.join("ui-version.env");
+
+    let (ui_version, ui_commit) = if ui_dir.exists() {
+        let version_output = Command::new("git")
+            .args([
+                "-C",
+                ui_dir.to_str().unwrap(),
+                "describe",
+                "--tags",
+                "--abbrev=0",
+            ])
+            .output();
+
+        let commit_output = Command::new("git")
+            .args(["-C", ui_dir.to_str().unwrap(), "rev-parse", "HEAD"])
+            .output();
+
+        match (version_output, commit_output) {
+            (Ok(version_output), Ok(commit_output)) if version_output.status.success() => {
+                let ui_version = String::from_utf8_lossy(&version_output.stdout)
+                    .trim()
+                    .trim_start_matches('v')
+                    .to_string();
+                let ui_commit = String::from_utf8_lossy(&commit_output.stdout)
+                    .trim()
+                    .to_string();
+                (ui_version, ui_commit)
+            }
+            _ => ("unknown".to_string(), "unknown".to_string()),
+        }
+    } else {
+        ("unknown".to_string(), "unknown".to_string())
+    };
+
+    let version_content = format!("UI_VERSION={}\nUI_COMMIT={}\n", ui_version, ui_commit);
     fs::write(&version_file_in_dist, version_content)
         .expect("Failed to write ui-version.env in static/");
 
