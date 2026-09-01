@@ -6,6 +6,8 @@ FROM node:24-alpine AS ui-build
 # Install git for version detection
 RUN apk add --no-cache git
 
+RUN npm install --global npm@10.9.3
+
 WORKDIR /app/ui
 
 # Copy package files for dependency caching
