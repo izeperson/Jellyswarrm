@@ -127,9 +127,7 @@ fn provider_identity(item: &MediaItem) -> Option<String> {
     }
 
     identities.sort_by(|(left_key, left_id), (right_key, right_id)| {
-        left_key
-            .cmp(right_key)
-            .then_with(|| left_id.cmp(right_id))
+        left_key.cmp(right_key).then_with(|| left_id.cmp(right_id))
     });
 
     Some(
@@ -259,10 +257,12 @@ mod tests {
     #[test]
     fn custom_plugin_provider_ids_are_considered_in_duplicate_detection() {
         let mut first = tagged(1, 100, "Crash", "1996");
-        first.item.provider_ids = Some(serde_json::json!({ "Tmdb": "1996", "AniList": "anime-42" }));
+        first.item.provider_ids =
+            Some(serde_json::json!({ "Tmdb": "1996", "AniList": "anime-42" }));
 
         let mut second = tagged(2, 100, "Crash", "2004");
-        second.item.provider_ids = Some(serde_json::json!({ "Tmdb": "2004", "AniList": "anime-99" }));
+        second.item.provider_ids =
+            Some(serde_json::json!({ "Tmdb": "2004", "AniList": "anime-99" }));
 
         let result = label_duplicates(vec![first, second]);
 

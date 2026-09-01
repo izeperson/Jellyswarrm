@@ -682,13 +682,21 @@ mod tests {
         service
             .unregister_websocket_with_grace(s1.session_id.clone(), first_connection_id)
             .await;
-        assert!(service.state.read().await.disconnect_grace_ids.contains_key(&s1.session_id));
+        assert!(service
+            .state
+            .read()
+            .await
+            .disconnect_grace_ids
+            .contains_key(&s1.session_id));
 
         let second_connection_id = service.register_websocket(s1.session_id.clone(), tx2).await;
         let _ = recv_json(&mut rx2).await;
 
         let state = service.state.read().await;
-        assert_eq!(state.ws_connection_ids.get(&s1.session_id), Some(&second_connection_id));
+        assert_eq!(
+            state.ws_connection_ids.get(&s1.session_id),
+            Some(&second_connection_id)
+        );
         assert!(!state.disconnect_grace_ids.contains_key(&s1.session_id));
     }
 
