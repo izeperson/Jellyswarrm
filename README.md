@@ -9,8 +9,8 @@
 <a href="https://www.gnu.org/licenses/old-licenses/gpl-2.0.html">
 <img alt="MIT License" src="https://img.shields.io/badge/License-GPL_v2-blue.svg"/>
 </a>
-<a href="https://github.com/LLukas22/Jellyswarrm/releases">
-<img alt="Current Release" src="https://img.shields.io/github/release/LLukas22/Jellyswarrm.svg"/>
+<a href="https://github.com/izeperson/Jellyswarrm/releases">
+<img alt="Current Release" src="https://img.shields.io/github/release/izeperson/Jellyswarrm.svg"/>
 </a>
 </p>
 
@@ -33,7 +33,7 @@ Jellyswarrm is a reverse proxy that lets you combine multiple Jellyfin servers i
 ## Features
 
 > [!WARNING]
-> Jellyswarrm is still in **early development**. It works, but some features are incomplete or missing. If you run into issues, please report them on the [GitHub Issues page](https://github.com/LLukas22/Jellyswarrm/issues).
+> Jellyswarrm is still in **early development**. It works, but some features are incomplete or missing. If you run into issues, please report them on the [GitHub Issues page](https://github.com/izeperson/Jellyswarrm/issues).
 
 ### ✅ Working
 
@@ -46,23 +46,23 @@ Jellyswarrm is a reverse proxy that lets you combine multiple Jellyfin servers i
 
 ### ⚠️ In Progress
 
-* **QuickConnect** – Sign in on one device by approving the code from another authenticated device.
-* **Websocket Support** – Needed for real-time features like SyncPlay (not fully reliable yet).
-* **Audio Streaming** – Progressive and HLS audio use the video streaming path.
-* **Automatic Bitrate Adjustment** – Stream quality based on network conditions isn’t supported yet.
-* **Media Management** – Features like adding or deleting media libraries through Jellyswarrm are not implemented yet.
+* **QuickConnect** – Sign in on one device by approving the code from another authenticated device. Core flow implemented; UX polish and edge cases remain.
+* **SyncPlay / Websocket Support** – Real-time co-watching via websockets. Functional but connection stability and reconnection handling need improvement.
+* **Audio Streaming** – Progressive and HLS audio routes exist and use the shared streaming pipeline. Transcoding parameter passthrough works; direct play optimization pending.
+* **Automatic Bitrate Adjustment** – `MaxStreamingBitrate` is forwarded to upstream servers; client-side adaptive bitrate logic not yet implemented.
+* **Media Management** – Adding/removing libraries or editing server config via Jellyswarrm UI is not implemented.
 
 ---
 
 ## Deployment
 
-The easiest way to run Jellyswarrm is with the prebuilt [Docker images](https://github.com/LLukas22?tab=packages&repo_name=Jellyswarrm).
-Here’s a minimal `docker-compose.yml` example to get started:
+The easiest way to run Jellyswarrm is with the prebuilt [Docker images](https://github.com/izeperson?tab=packages&repo_name=Jellyswarrm).
+Here's a minimal `docker-compose.yml` example to get started:
 
 ```yaml
 services:
   jellyswarrm:
-    image: ghcr.io/llukas22/jellyswarrm:latest
+    image: ghcr.io/izeperson/jellyswarrm:latest
     container_name: jellyswarrm
     restart: unless-stopped
     ports:
@@ -92,7 +92,7 @@ For advanced configuration options, check out the [ui](./docs/ui.md) and [config
 To get started with development, you'll need to clone the repository along with its submodules. This ensures you have all the necessary components for a complete build:
 
 ```bash
-git clone --recurse-submodules https://github.com/LLukas22/Jellyswarrm.git
+git clone --recurse-submodules https://github.com/izeperson/Jellyswarrm.git
 ```
 
 If you've already cloned the repository, you can initialize the submodules separately:
@@ -133,12 +133,13 @@ automatically register all six local servers from `data/jellyswarrm.dev.toml`.
 <details>
 <summary><strong>Native Build</strong></summary>
 
-For a native development setup, ensure you have both Rust and Node.js installed on your system. 
+For a native development setup, ensure you have both Rust and Node.js 24 installed on your system. 
 
 First, install the UI dependencies. You can use the convenient VS Code task `Install UI Dependencies` from the tasks.json file, or run it manually:
 
 ```bash
 cd ui
+npm install --global npm@10.9.3
 npm install
 cd ..
 ```

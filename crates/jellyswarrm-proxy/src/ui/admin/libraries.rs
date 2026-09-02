@@ -756,6 +756,8 @@ mod tests {
         assert!(html.contains("draggable=\"true\""));
         assert!(html.contains("data-library-dropzone"));
         assert!(html.contains("data-group-id=\"group-id\""));
+        assert!(html.contains("title=\"Add to existing library\""));
+        assert!(html.contains(">Add</button>"));
     }
 
     #[test]

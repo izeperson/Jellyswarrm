@@ -26,7 +26,7 @@
                      aria-grabbed="false">
                 <div class="library-drag-handle"
                      data-library-drag-handle
-                     title="{% if library.assignable_groups.is_empty() %}No compatible virtual library{% else %}Drag {{ library.library_name }}{% endif %}"
+                     title="{% if library.assignable_groups.is_empty() %}No compatible existing library{% else %}Drag {{ library.library_name }} to add it to an existing library{% endif %}"
                      aria-hidden="true">
                     {% if library.assignable_groups.is_empty() %}<i class="fas fa-lock"></i>{% else %}<i class="fas fa-grip-vertical"></i>{% endif %}
                 </div>
@@ -48,9 +48,9 @@
 
                 {% if !library.assignable_groups.is_empty() %}
                 <details class="library-assignment-fallback" data-library-popover>
-                    <summary class="icon-btn" role="button" aria-haspopup="true" title="Move to virtual library" aria-label="Move {{ library.library_name }} to a virtual library">
+                    <summary class="icon-btn" role="button" aria-haspopup="true" title="Add to existing library" aria-label="Add {{ library.library_name }} to an existing library">
                         <i class="fas fa-ellipsis" aria-hidden="true"></i>
-                        <span class="sr-only">Move {{ library.library_name }}</span>
+                        <span class="sr-only">Add {{ library.library_name }} to an existing library</span>
                     </summary>
                     <form class="library-assignment-form"
                           hx-post="/{{ ui_route }}/libraries/assign"
@@ -59,14 +59,14 @@
                         <input type="hidden" name="server_id" value="{{ library.server_id }}">
                         <input type="hidden" name="library_id" value="{{ library.library_id }}">
                         <label>
-                            Virtual library
+                            Existing library
                             <select name="group_virtual_id" required>
                                 {% for group in library.assignable_groups %}
                                 <option value="{{ group.virtual_id }}">{{ group.name }}</option>
                                 {% endfor %}
                             </select>
                         </label>
-                        <button type="submit" class="secondary">Move</button>
+                        <button type="submit" class="secondary">Add</button>
                     </form>
                 </details>
                 {% endif %}
@@ -138,12 +138,12 @@
 
                 <div class="library-drop-prompt">
                     <i class="fas fa-arrow-down" aria-hidden="true"></i>
-                    <span>Drop library here</span>
+                    <span>Drop library here to add it</span>
                 </div>
 
                 {% if group.members.is_empty() %}
                 <div class="library-group-empty">
-                    <span>Drop a real library here</span>
+                    <span>Drop a library here to add it</span>
                     <small>The first library sets the type.</small>
                 </div>
                 {% else %}
